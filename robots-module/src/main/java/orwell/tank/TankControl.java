@@ -1,137 +1,100 @@
 package orwell.tank;
 
-import lejos.mf.common.UnitMessageType;
-import lejos.nxt.*;
-import lejos.mf.common.MessageListenerInterface;
 import lejos.mf.common.UnitMessage;
+import lejos.mf.common.UnitMessageType;
 import lejos.mf.nxt.MessageFrameworkNXT;
-import lejos.nxt.addon.RFIDSensor;
+import lejos.nxt.Button;
+import lejos.nxt.Sound;
+import orwell.tank.config.TankFileBom;
+import orwell.tank.config.TankFileParser;
+import orwell.tank.elements.DisplayScreen;
+import orwell.tank.exception.ParseIniException;
+import orwell.tank.inputs.ConnectedToProxy;
+import orwell.tank.inputs.StartTank;
+import orwell.tank.inputs.WaitForProxy;
+import orwell.tank.messaging.UnitMessageBroker;
+
+import java.io.FileNotFoundException;
 
 
 /**
  * Thread to wait for a Bluetooth connection and execute remote commands
  */
-class TankControl extends Thread implements MessageListenerInterface {
-	protected volatile boolean remoteCtrlAlive;
+class TankControl extends Thread {
+    private static final long THREAD_SLEEP_MS = 10;
+    private final Tank tank;
+    private MessageFrameworkNXT messageFramework;
+    private UnitMessageBroker unitMessageBroker;
 
-	NXTMotor motorLeft = new NXTMotor(MotorPort.B);
-	NXTMotor motorRight = new NXTMotor(MotorPort.C);
-	RFIDSensor rfidSensor = new RFIDSensor(SensorPort.S2);
+    public TankControl(Tank tank) {
+        this.tank = tank;
+    }
 
-	public void run() {
-		remoteCtrlAlive = true;
+    public static void main(String[] args) {
+        TankControl tankControl = TankControl.build();
+        if (null == tankControl) {
+            Button.waitForAnyPress();
+            System.exit(0);
+        }
+        tankControl.startRemoteControl();
+    }
 
-		LCD.drawString(" Waiting for PC ", 0, 5, true);
-		MessageFrameworkNXT mfw = MessageFrameworkNXT.getInstance();
-		mfw.addMessageListener(this);
-		mfw.StartListen();
-		LCD.drawString("Connected!", 0, 5, true);
-		Sound.beep();
+    public static TankControl build() {
+        try {
+            TankFileParser tankFileParser = new TankFileParser();
+            TankFileBom tankFileBom = tankFileParser.parse();
+            Tank tank = new Tank(tankFileBom);
+            return new TankControl(tank);
+        } catch (FileNotFoundException e) {
+            DisplayScreen.printError(".ini not found");
+            Sound.buzz();
+        } catch (ParseIniException e) {
+            DisplayScreen.printError("Parse ini failed");
+            Sound.buzz();
+        }
+        return null;
+    }
 
-		UnitMessage rfidMessage;
-		String rfidValueCurrent;
-		String rfidValuePrevious = "null";
+    public void run() {
+        tank.setIsTankAlive(true);
 
-		while (!Button.ESCAPE.isDown() && remoteCtrlAlive) {
-			rfidValueCurrent = Long.toString(rfidSensor.readTransponderAsLong(true));
+        while (!Button.ESCAPE.isDown() && tank.isAlive()) {
+            try {
+                Thread.currentThread().sleep(THREAD_SLEEP_MS);
+            } catch (InterruptedException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }
+        stopProgram();
+    }
 
-			if (rfidValueCurrent.compareTo(rfidValuePrevious) == 0) {
-				continue;
-			} else {
-				LCD.clear(4);
-				LCD.clear(5);
-				LCD.drawString(rfidValueCurrent, 0, 4, false);
-				LCD.drawString(Integer.toString(rfidSensor.getStatus()), 0, 5, false);
+    private void stopProgram() {
+        UnitMessage stopMessage = new UnitMessage(UnitMessageType.Stop, "Tank Program Stopped");
+        messageFramework.SendMessage(stopMessage);
+        stopMessageBroker();
+    }
 
-				rfidMessage = new UnitMessage(UnitMessageType.Rfid, rfidValueCurrent);
-				mfw.SendMessage(rfidMessage);
-				rfidValuePrevious = rfidValueCurrent;
-			}
-		}
-		Sound.buzz();
-		UnitMessage stopMessage = new UnitMessage(UnitMessageType.Stop, "Escape Button pressed");
-		mfw.SendMessage(stopMessage);
-	}
+    private void startRemoteControl() {
+        tank.accept(new StartTank()); // Ready the tank
+        waitForConnectionToProxy(); // Establish BT connection
+        startMessageBroker(); // Start listening to sensors
+        start();
+    }
 
-	public void stop_robot() {
-		remoteCtrlAlive = false;
-	}
+    private void waitForConnectionToProxy() {
+        tank.accept(new WaitForProxy());
+        messageFramework = MessageFrameworkNXT.getInstance();
 
-	public static void main(String[] args) {
-		new TankControl().run();
-	}
+        tank.accept(new ConnectedToProxy());
+    }
 
-	// public boolean isAlive(){
-	// return remoteCtrlAlive;
-	// }
+    private void startMessageBroker() {
+        unitMessageBroker = new UnitMessageBroker(messageFramework, tank);
+        unitMessageBroker.startListen();
+    }
 
-	public void receivedNewMessage(UnitMessage msg) {
-		LCD.drawString("Command: " + msg.getPayload(), 0, 5);
-		if (msg.getPayload().equals("stop")) {
-			motorLeft.stop();
-			motorRight.stop();
-			LCD.clearDisplay();
-			LCD.drawString("STOP", 0, 6);
-		}
-
-		else if (msg.getPayload().equals("stopPrg")) {
-			motorLeft.stop();
-			motorRight.stop();
-			LCD.clearDisplay();
-			LCD.drawString("PROGRAM STOPPED", 0, 6);
-			stop_robot();
-		} else if (msg.getPayload().startsWith("input")) {
-			String inputString = msg.getPayload().toString();
-			LCD.clearDisplay();
-			LCD.drawString("1" + inputString, 0, 1);
-			String inputType = inputString
-					.substring(inputString.indexOf(" ") + 1);
-			// LCD.clearDisplay();
-			LCD.drawString("2" + inputType, 0, 2);
-			if (inputType.startsWith("move")) {
-				String moveOrder = inputType
-						.substring(inputType.indexOf(" ") + 1);
-				// LCD.clearDisplay();
-				LCD.drawString("3" + moveOrder, 0, 3);
-				LCD.drawString(
-						"4" + moveOrder.substring(0, moveOrder.indexOf(" ")),
-						0, 4);
-				LCD.drawString(
-						"5" + moveOrder.substring(moveOrder.indexOf(" ") + 1),
-						0, 5);
-				Double moveLeft = Double.parseDouble(((moveOrder.substring(0,
-						moveOrder.indexOf(" "))))) * 100;
-				Double moveRight = Double.parseDouble((moveOrder
-						.substring(moveOrder.indexOf(" ") + 1))) * 100;
-				// Double moveLeft = 0.50 * 100;
-				// Double moveRight = -0.234 * 100;
-				motorLeft.setPower(Math.abs(moveLeft.intValue()));
-				motorRight.setPower(Math.abs(moveRight.intValue()));
-				LCD.clearDisplay();
-				LCD.drawString("MVL: " + moveLeft, 0, 5);
-				LCD.drawString("MVR: " + Math.abs(moveRight.intValue()), 0, 6);
-				if (moveLeft > 0)
-					motorLeft.backward();
-				else if (moveLeft < 0)
-					motorLeft.forward();
-				else
-					motorLeft.stop();
-				if (moveRight > 0)
-					motorRight.backward();
-				else if (moveRight < 0)
-					motorRight.forward();
-				else
-					motorRight.stop();
-			} else if (inputType.startsWith("fire")) {
-				Sound.buzz();
-			} else {
-				LCD.drawString("Input Nomatch", 0, 5);
-			}
-			// LCD.clearDisplay();
-			// LCD.drawString("Input order received: ", 0, 1);
-		} else {
-			LCD.drawString("No match", 0, 1);
-		}
-
-	}
+    private void stopMessageBroker() {
+        unitMessageBroker.stopListen();
+    }
 }

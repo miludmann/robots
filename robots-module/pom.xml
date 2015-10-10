@@ -24,6 +24,37 @@
             <artifactId>classes</artifactId>
             <version>0.9.1beta-3</version>
         </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.11</version>
+        </dependency>
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>1.1.2</version>
+        </dependency>
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-core</artifactId>
+            <version>1.1.2</version>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>1.7.7</version>
+        </dependency>
+        <dependency>
+            <groupId>org.easymock</groupId>
+            <artifactId>easymock</artifactId>
+            <version>3.2</version>
+        </dependency>
+        <dependency>
+            <groupId>org.powermock</groupId>
+            <artifactId>powermock-easymock-release-full</artifactId>
+            <version>1.5.6</version>
+            <classifier>full</classifier>
+        </dependency>
     </dependencies>
     <build>
         <plugins>
@@ -67,6 +98,8 @@
                             <arguments>
                                 <argument>-v</argument>
                                 <argument>-oTankControl.nxj</argument>
+                                <argument>-od</argument>
+                                <argument>DebugInfo.nxd</argument>
                                 <argument>orwell.tank.TankControl</argument>
                                 <argument>--classpath</argument>
                                 <argument>.:../../../lejos-mf-nxt/lejos-mf-nxt-module/target/classes:../../../lejos-mf-nxt/lejos-mf-common/target/classes</argument>
@@ -132,7 +165,7 @@
             <plugin>
                 <groupId>org.eluder.coveralls</groupId>
                 <artifactId>coveralls-maven-plugin</artifactId>
-                <version>3.0.1</version>
+                <version>3.1.0</version>
                 <configuration>
                     <repoToken>${COVERALLS_REPO_TOKEN}</repoToken>
                 </configuration>
@@ -140,7 +173,7 @@
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>cobertura-maven-plugin</artifactId>
-                <version>2.6</version>
+                <version>2.7</version>
                 <configuration>
                     <format>xml</format>
                     <maxmem>256m</maxmem>

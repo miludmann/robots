@@ -2,7 +2,7 @@
 robots
 ===============
 
-This is the code running one the NXT robots themselves.
+This is the code running on the NXT robots themselves.
 
 Checkout the code
 -----------------
@@ -20,7 +20,7 @@ local setup for coveralls
 -------------------------
 Run with maven
 --------------
-Prerequiste: have jdk-7+ installed on your machine
+Prerequisite: have jdk-7+ installed on your machine
 ```
 javac -version
 >javac 1.7.xxx
@@ -41,7 +41,7 @@ tar -xvf leJOS_NXJ_0.9.1beta-3.tar.gz
 export NXJ_HOME=leJOS_NXJ_0.9.1beta-3
 ```
 
-Run maven install, specifing the name of your NXT device on which you want to run the program
+Run maven install, providing the name of your NXT device on which you want to run the program
 ```
 mvn validate
 mvn clean install -Drobotname=YourRobotNameHere
